@@ -1,9 +1,8 @@
 import streamlit as st
 import chess
 import chess.pgn
-import chess.engine
 import io
-import os
+from stockfish import Stockfish
 
 # ---------------- CONFIG ----------------
 st.set_page_config(
@@ -12,10 +11,40 @@ st.set_page_config(
     layout="wide"
 )
 
-STOCKFISH_PATH = os.getenv("STOCKFISH_PATH", "/usr/games/stockfish")
-
 HIGHLIGHT_FROM = "#f7ec6e"
 HIGHLIGHT_TO = "#f1c40f"
+
+# ---------------- ENGINE ----------------
+@st.cache_resource
+def load_engine():
+    return Stockfish(
+        path=None,  # usa el binario incluido
+        parameters={
+            "Threads": 2,
+            "Minimum Thinking Time": 30
+        }
+    )
+
+def explain_eval(cp):
+    if cp > 150:
+        return "Las blancas tienen clara ventaja."
+    if cp > 50:
+        return "Las blancas están ligeramente mejor."
+    if cp > -50:
+        return "La posición está equilibrada."
+    if cp > -150:
+        return "Las negras están ligeramente mejor."
+    return "Las negras tienen clara ventaja."
+
+def analyze_position(board, engine):
+    engine.set_fen_position(board.fen())
+    ev = engine.get_evaluation()
+
+    if ev["type"] == "mate":
+        return f"Mate en {ev['value']}", "⚠️ Posición decisiva"
+
+    cp = ev["value"]
+    return f"{cp/100:.2f}", explain_eval(cp)
 
 # ---------------- SVG TABLERO ----------------
 def board_svg(board, last_move=None):
@@ -38,54 +67,11 @@ def board_svg(board, last_move=None):
 
     return svg
 
-# ---------------- ANÁLISIS ----------------
-def analyze_position(board, engine):
-    info = engine.analyse(board, chess.engine.Limit(depth=15))
-    score = info["score"].white()
-
-    if score.is_mate():
-        return f"Mate en {score.mate()}", "⚠️ Posición decisiva"
-    else:
-        cp = score.score()
-        text = f"{cp/100:.2f}"
-
-        explanation = explain_eval(cp)
-        return text, explanation
-
-def explain_eval(cp):
-    if cp > 150:
-        return "Las blancas tienen clara ventaja: mejor actividad y control."
-    if cp > 50:
-        return "Las blancas están ligeramente mejor."
-    if cp > -50:
-        return "La posición está equilibrada."
-    if cp > -150:
-        return "Las negras están ligeramente mejor."
-    return "Las negras tienen clara ventaja."
-
-def explain_move(board_before, board_after, move):
-    piece = board_before.piece_at(move.from_square)
-    piece_name = piece.symbol().upper()
-
-    reasons = []
-
-    if board_after.is_check():
-        reasons.append("da jaque")
-
-    if board_after.is_capture(move):
-        reasons.append("captura material")
-
-    if piece_name in ["N", "B"] and chess.square_rank(move.to_square) in [4,5]:
-        reasons.append("mejora la actividad de la pieza")
-
-    if not reasons:
-        reasons.append("mejora la posición general")
-
-    return f"Este movimiento {', '.join(reasons)}."
-
 # ---------------- APP ----------------
 def main():
     st.title("♟️ Visor y Analizador de Partidas")
+
+    engine = load_engine()
 
     # ----------- STATE -----------
     for k, v in {
@@ -115,6 +101,22 @@ def main():
                 st.session_state.current_move_index = 0
                 st.session_state.moves = list(games[0].mainline_moves())
                 st.session_state.last_uploaded_file = uploaded
+                st.rerun()
+
+        if st.session_state.games:
+            options = [
+                f"{i+1}. {g.headers.get('White')} – {g.headers.get('Black')}"
+                for i, g in enumerate(st.session_state.games)
+            ]
+            selected = st.selectbox("Seleccionar partida", options)
+            idx = int(selected.split(".")[0]) - 1
+
+            if idx != st.session_state.current_game_index:
+                st.session_state.current_game_index = idx
+                st.session_state.current_move_index = 0
+                st.session_state.moves = list(
+                    st.session_state.games[idx].mainline_moves()
+                )
                 st.rerun()
 
     # ---------------- INFO + CONTROLES ----------------
@@ -169,9 +171,7 @@ def main():
         st.markdown(board_svg(board, last_move), unsafe_allow_html=True)
 
         if last_move:
-            with chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH) as engine:
-                eval_text, eval_expl = analyze_position(board, engine)
-
+            eval_text, eval_expl = analyze_position(board, engine)
             st.markdown("### 🧠 Análisis del movimiento")
             st.write(eval_expl)
             st.write(f"**Evaluación:** {eval_text}")
@@ -190,7 +190,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
 
