@@ -6,7 +6,7 @@ import requests
 
 # ---------------- CONFIGURACIÓN ----------------
 st.set_page_config(
-    page_title="♟️ Visor y Analizador de Partidas PGN",
+    page_title="♟️ RedRock Chess PGN",
     page_icon="♟️",
     layout="wide"
 )
