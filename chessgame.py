@@ -30,7 +30,7 @@ def create_board_svg(board):
 
 # ---------------- APP ----------------
 def main():
-    st.title("♟️ Visor y Analizador de Partidas PGN")
+    st.title("♟️ RedRock Chess PGN by Salva Rosales")
     st.markdown("Carga un archivo PGN y revisa partidas con análisis en tiempo real.")
 
     # ---------------- SESIÓN ----------------
