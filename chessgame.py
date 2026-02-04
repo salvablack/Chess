@@ -4,13 +4,14 @@ import chess.pgn
 import io
 import requests
 
-# Configuración inicial
+# ---------------- CONFIGURACIÓN ----------------
 st.set_page_config(
     page_title="♟️ Visor y Analizador de Partidas PGN",
     page_icon="♟️",
     layout="wide"
 )
 
+# ---------------- FUNCIONES ----------------
 def get_lichess_analysis(fen):
     """Consulta la evaluación en Lichess API usando la posición FEN"""
     url = "https://lichess.org/api/cloud-eval"
@@ -19,22 +20,20 @@ def get_lichess_analysis(fen):
         response = requests.get(url, params=params, timeout=5)
         if response.status_code == 200:
             return response.json()
-        else:
-            return None
+        return None
     except Exception:
         return None
 
-def create_board_svg(board, highlight_move=None):
-    """Genera SVG del tablero con posible resaltado (movimiento)"""
-    svg = board._repr_svg_()
-    # Aquí podrías agregar lógica para resaltar casillas si quieres
-    return svg
+def create_board_svg(board):
+    """Genera SVG del tablero"""
+    return board._repr_svg_()
 
+# ---------------- APP ----------------
 def main():
     st.title("♟️ Visor y Analizador de Partidas PGN")
-    st.markdown("Carga un archivo PGN para revisar partidas con análisis en tiempo real.")
+    st.markdown("Carga un archivo PGN y revisa partidas con análisis en tiempo real.")
 
-    # Estados de sesión
+    # ---------------- SESIÓN ----------------
     if "games" not in st.session_state:
         st.session_state.games = []
     if "current_game_index" not in st.session_state:
@@ -46,10 +45,10 @@ def main():
     if "moves" not in st.session_state:
         st.session_state.moves = []
 
-    # Sidebar - carga de archivo y selección de partida
+    # ---------------- SIDEBAR ----------------
     with st.sidebar:
         st.header("Controles")
-        uploaded_file = st.file_uploader("Carga un archivo PGN", type=["pgn"])
+        uploaded_file = st.file_uploader("Cargar archivo PGN", type=["pgn"])
 
         if uploaded_file is not None and uploaded_file != st.session_state.get("last_uploaded_file"):
             pgn_text = uploaded_file.read().decode("utf-8")
@@ -99,33 +98,28 @@ def main():
                 game = st.session_state.games[new_index]
                 st.session_state.board = game.board()
                 st.session_state.moves = list(game.mainline_moves())
-                st.experimental_rerun()
 
-    # Controles de movimiento fijos arriba (solo si hay partidas)
+    # ---------------- CONTROLES DE MOVIMIENTO ----------------
     if st.session_state.games and st.session_state.moves:
         cols = st.columns([1, 1, 2, 1, 1])
         with cols[0]:
             if st.button("⏮️ Primera"):
                 st.session_state.current_move_index = 0
-                st.experimental_rerun()
         with cols[1]:
             if st.button("◀️ Anterior"):
                 if st.session_state.current_move_index > 0:
                     st.session_state.current_move_index -= 1
-                    st.experimental_rerun()
         with cols[2]:
             st.markdown(f"### Movimiento {st.session_state.current_move_index} / {len(st.session_state.moves)}", unsafe_allow_html=True)
         with cols[3]:
             if st.button("Siguiente ▶️"):
                 if st.session_state.current_move_index < len(st.session_state.moves):
                     st.session_state.current_move_index += 1
-                    st.experimental_rerun()
         with cols[4]:
             if st.button("⏭️ Última"):
                 st.session_state.current_move_index = len(st.session_state.moves)
-                st.experimental_rerun()
 
-    # Mostrar tablero y análisis
+    # ---------------- TABLERO Y ANALISIS ----------------
     col1, col2 = st.columns([3, 2])
 
     with col1:
@@ -153,7 +147,7 @@ def main():
                 board_temp.push(move)
             st.markdown("\n".join(moves_text), unsafe_allow_html=True)
 
-            # Análisis en tiempo real usando Lichess API
+            # Analisis en tiempo real con Lichess API
             fen = board_temp.fen()
             analysis = get_lichess_analysis(fen)
             if analysis and "pvs" in analysis:
@@ -163,7 +157,6 @@ def main():
                 if mate is not None:
                     score_text = f"Jaque mate en {mate} movimientos"
                 elif score is not None:
-                    # Convertimos centipawns a formato normal, positivo = ventaja blancas
                     score_text = f"Evaluación: {score / 100:.2f}"
                 else:
                     score_text = "Evaluación no disponible"
