@@ -4,32 +4,54 @@ import chess
 import chess.pgn
 import io
 
-# ---------------- CONFIGURACIÓN ----------------
+# ---------------- CONFIG ----------------
 st.set_page_config(
     page_title="Chess PGN Viewer",
     page_icon="♟️",
     layout="wide"
 )
 
-# ---------------- FUNCIONES ----------------
-def board_svg(board: chess.Board):
-    return board._repr_svg_()
+HIGHLIGHT_FROM = "#f7ec6e"
+HIGHLIGHT_TO = "#f1c40f"
+
+# ---------------- SVG CON ANIMACIÓN ----------------
+def board_svg(board, last_move=None):
+    svg = board._repr_svg_()
+
+    if last_move:
+        from_sq = chess.square_name(last_move.from_square)
+        to_sq = chess.square_name(last_move.to_square)
+
+        style = f"""
+        <style>
+        .square-{from_sq}, .square-{to_sq} {{
+            transition: fill 0.4s ease-in-out;
+        }}
+        .square-{from_sq} {{ fill: {HIGHLIGHT_FROM} !important; }}
+        .square-{to_sq} {{ fill: {HIGHLIGHT_TO} !important; }}
+        </style>
+        """
+        svg = svg.replace("</svg>", style + "</svg>")
+
+    return svg
 
 # ---------------- APP ----------------
 def main():
-    st.title("♟️ Visor de Partidas PGN")
+    st.title("♟️ RedRock Chess PGN")
 
-    # ----------- ESTADO -----------
-    for key, default in {
+    # ----------- STATE -----------
+    defaults = {
         "games": [],
         "current_game_index": 0,
         "current_move_index": 0,
         "board": chess.Board(),
         "moves": [],
-        "last_uploaded_file": None
-    }.items():
-        if key not in st.session_state:
-            st.session_state[key] = default
+        "last_uploaded_file": None,
+    }
+
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
 
     # ---------------- SIDEBAR ----------------
     with st.sidebar:
@@ -69,15 +91,13 @@ def main():
                 st.session_state.moves = list(game.mainline_moves())
                 st.rerun()
 
-    # ---------------- INFO + CONTROLES (ARRIBA) ----------------
+    # ---------------- INFO + CONTROLES ----------------
     if st.session_state.games:
         game = st.session_state.games[st.session_state.current_game_index]
 
         st.markdown(
-            f"""
-            **{game.headers.get('White')}** vs **{game.headers.get('Black')}**  
-            *{game.headers.get('Event','')}*
-            """
+            f"**{game.headers.get('White')}** vs **{game.headers.get('Black')}  \n"
+            f"*{game.headers.get('Event','')}*"
         )
 
         c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
@@ -95,7 +115,7 @@ def main():
         with c3:
             st.markdown(
                 f"<h4 style='text-align:center;'>"
-                f"Movimiento {st.session_state.current_move_index} / {len(st.session_state.moves)}"
+                f"{st.session_state.current_move_index} / {len(st.session_state.moves)}"
                 f"</h4>",
                 unsafe_allow_html=True
             )
@@ -115,15 +135,22 @@ def main():
     # ---------------- CONTENIDO ----------------
     col1, col2 = st.columns([3, 2])
 
-    # ----------- TABLERO -----------
+    # ----------- TABLERO ANIMADO -----------
     with col1:
         if st.session_state.games:
             board = st.session_state.board.copy()
-            for move in st.session_state.moves[:st.session_state.current_move_index]:
+            last_move = None
+
+            for i, move in enumerate(
+                st.session_state.moves[:st.session_state.current_move_index]
+            ):
                 board.push(move)
-            st.markdown(board_svg(board), unsafe_allow_html=True)
-        else:
-            st.info("Carga un archivo PGN")
+                last_move = move
+
+            st.markdown(
+                board_svg(board, last_move),
+                unsafe_allow_html=True
+            )
 
     # ----------- MOVIMIENTOS PROGRESIVOS -----------
     with col2:
@@ -149,5 +176,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
