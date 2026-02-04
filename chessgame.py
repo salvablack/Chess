@@ -17,8 +17,10 @@ HIGHLIGHT_TO = "#f1c40f"
 # ---------------- ENGINE ----------------
 @st.cache_resource
 def load_engine():
+    # Cambia esta ruta si tu ejecutable está en otro lugar
+    stockfish_path = "./stockfish/src/stockfish"  
     return Stockfish(
-        path=None,  # usa el binario incluido
+        path=stockfish_path,
         parameters={
             "Threads": 2,
             "Minimum Thinking Time": 30
@@ -190,6 +192,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
